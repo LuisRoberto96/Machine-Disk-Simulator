@@ -1,0 +1,12 @@
+05:24:39 **** Incremental Build of configuration Debug for project Tp3 ****
+Info: Internal Builder is used for build
+g++ -O0 -g3 -Wall -c -fmessage-length=0 -o functions.o "..\\functions.cpp" 
+..\functions.cpp: In function 'void Maquina(Instrucao*, int, int&, int&, int&, int&, int&, int&, int, int, int, Linha*, Linha*, Linha*, Linha*, int&, int&, int)':
+..\functions.cpp:300:11: warning: variable 'envia' set but not used [-Wunused-but-set-variable]
+  int soma,envia,subtracao;
+           ^
+g++ -o Tp3.exe functions.o gerador.o main.o 
+g++: error: gerador.o: No such file or directory
+
+05:24:49 Build Finished (took 9s.778ms)
+

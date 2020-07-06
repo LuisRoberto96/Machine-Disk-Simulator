@@ -1,0 +1,393 @@
+/*
+ * functions.cpp
+ *
+ *  Created on: 5 de fev de 2018
+ *      Author: luisf
+ */
+#include "functions.hpp"
+#include "geral.hpp"
+
+//-------------------------------------------------FUNCAO DE TRATAMENTO DE INTERRUPCAO----------------------------------------------------------------
+//--------MECHER AQUI AQUI---------
+void interrupcao(int& interrupcao,int& parar_interrupcao,int& miss1,int& miss2,int& miss3,int& hit1,int& hit2,int& hit3,int tam1,int tam2,int tam3,Linha*cache1,Linha*cache2,Linha*cache3,Linha*ram,int&miss4,int&hit4,int taml4){
+	srand(time(NULL));
+	int aux=0;
+	Instrucao operation[5];
+	for(int i=0;i<5;i++){
+		operation[i].opcode=2;
+	    operation[i].endereco1.endBloco=rand()%5000;
+		operation[i].endereco1.endPalavra=rand()%4;
+		operation[i].endereco2.endBloco=rand()%5000;
+		operation[i].endereco2.endPalavra=rand()%4;
+	}
+	operation[5].opcode=-1;
+
+	interrupcao = rand()%10;
+	if(interrupcao<5){
+		if(parar_interrupcao<3){
+			char variavel;
+			cout<<"\n\nProcesso de interrupacao.Digite qualquer coisa para continuar"<<endl;
+			cin>> variavel;
+			while(operation[aux].opcode != -1){
+				multiplica(operation,aux,miss1,miss2,miss3,hit1,hit2,hit3,tam1,tam2,tam3,cache1,cache2,cache3,ram,miss4,hit4,taml4);
+				aux++;
+			}
+			Maquina(operation,aux,miss1,miss2,miss3,hit1,hit2,hit3,TC1,TC2,TC3,cache1,cache2,cache3,ram,miss4,hit4,taml4);
+			parar_interrupcao++;
+		}
+	}
+
+
+}
+//-------------------------------------------------FUNCOES DE ATRIBUIR VALORES E INSERIR--------------------------------------------------------------
+void insere_enderecos(Instrucao operacao[TAM_INSTRUCAO]){
+	srand(time(NULL));
+	for(int i=0;i<TAM_INSTRUCAO;i++){
+		operacao[i].opcode =rand() %2;
+		operacao[i].endereco1.endBloco = rand() % 1000;
+		operacao[i].endereco1.endPalavra = rand() % 4;
+		operacao[i].endereco2.endBloco = rand() % 1000;
+		operacao[i].endereco2.endPalavra = rand() % 4;
+	}
+	operacao[TAM_INSTRUCAO -1].opcode=-1;
+}
+
+void cria_arquivo(){
+	srand(time(NULL));
+	int i;
+	Linha DISCO;
+	ofstream disco;
+	disco.open("disco.dat",ios::binary);
+	for(i=0;i<TAM_DISCO;i++)
+		DISCO.cachehit=0;
+		DISCO.endBloco=i;
+		DISCO.atualiza=0;
+		for(int j=0;j<4;j++)
+			DISCO.palavras[j]=rand()%10;
+		disco.write(((char*)&DISCO),sizeof(Linha));
+}
+
+
+void zera_cache(Linha *cache, int tam){
+	for (int j=0;j<4;j++){
+		for (int i=0;i<tam;i++){
+			cache[i].palavras[j]= -1;
+			cache[i].endBloco= -1;
+			cache[i].atualiza=0;
+			cache[i].cachehit=0;
+		}
+	}
+}
+
+void atribui_cache(int valor,Linha *cache,int tam,TEndereco end) {
+	for (int i=0;i<tam;i++) {
+		if(cache[i].endBloco==end.endBloco) {
+			cache[i].palavras[end.endPalavra]=valor;
+			cache[i].atualiza = 1;
+		}
+	}
+}
+
+void multiplica(Instrucao memoria[],int pc,int &miss1,int &miss2,int &miss3,int &hit1,int &hit2,int &hit3,int taml1,int taml2,int taml3,Linha *cache1,Linha *cache2,Linha *cache3,Linha*ram,int&miss4,int&hit4,int taml4) {
+	int  ValorUm,ValorDois;
+	memoria[pc].opcode=1;
+	ValorUm=MMU(memoria[pc].endereco1,miss1,miss2,miss3,hit1,hit2,hit3,taml1,taml2,taml3,cache1,cache2,cache3,ram,miss4,hit4,taml4);
+	ValorDois=MMU(memoria[pc].endereco2,miss1,miss2,miss3,hit1,hit2,hit3,taml1,taml2,taml3,cache1,cache2,cache3,ram,miss4,hit4,taml4);
+	atribui_cache(ValorUm,cache1,taml1,memoria[pc].endereco2);
+
+	if(ValorUm>1)
+		for (int i=0;i<ValorDois-1;i++)
+			Maquina(memoria,pc,miss1,miss2,miss3,hit1,hit2,hit3,taml1,taml2,taml3,cache1,cache2,cache3,ram,miss4,hit4,taml4);
+
+	else if(ValorDois==0)
+		atribui_cache(0,cache1,taml1,memoria[0].endereco2);
+
+	else if(ValorDois==1)
+		atribui_cache(ValorUm,cache1,taml1,memoria[0].endereco2);
+}
+
+void atualiza_ram(int**ram,Linha *cache,int tam){
+	for (int i=0;i<tam;i++){
+		if (cache[i].atualiza==1){
+			cache[i].cachehit=0;
+			cache[i].atualiza=0;
+			for(int j=0;j<4;j++){
+				ram[cache[i].endBloco][j]=cache[i].palavras[j];
+			}
+			zera_cache(cache,tam);
+		}
+		else
+			zera_cache(cache,tam);
+	}
+}
+
+void atualiza_arquivo(Linha*cache,int tam){
+	Linha*aux = new Linha[TAM_DISCO];
+	for(int i=0;i<tam;i++){
+		if(cache[i].atualiza==1){
+			aux[cache[i].endBloco].endBloco=cache[i].endBloco;
+			aux[cache[i].endBloco].atualiza=0;
+			aux[cache[i].endBloco].cachehit=0;
+			for(int j=0;j<4;j++)
+				aux[cache[i].endBloco].palavras[j]=cache[i].palavras[j];
+		}
+	}
+	zera_cache(cache,tam);
+
+	//ofstream disco;
+	//disco.open("disco.dat",ios::binary);
+	//disco.write(((char*)&aux),sizeof(Linha));
+
+	FILE* DISCO;
+		DISCO= fopen("disco.dat","w");
+		fwrite(&aux,sizeof(Linha),1,DISCO);
+		fclose(DISCO);
+}
+
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------//
+
+
+//----------------------------------------------------------FUNCOES QUE IMPRIMEM E DELETAM----------------------------------------------------------//
+void deleta_ram(int**ram,int tam){
+	for (int i=0;i<tam;i++)
+		delete ram[i];
+
+	delete ram;
+}
+
+void imprime_ram(int**ram,int taml,int tamc){
+	cout<<"\nRAM:"<<endl;
+	for (int i=0;i<taml;i++){
+		for (int j=0;j<tamc;j++) {
+			cout<<ram[i][j]<<" ";
+		}
+		cout<<endl;
+	}
+}
+
+//--------------------------------------------------------------------------------------------------------------------------------------------------//
+
+
+//--------------------------------------------------FUNCOES QUE TROCAM,PEGAM,BUSCAM----------------------------------------------------------------------//
+int busca_cache(TEndereco end, Linha *cache, int tam,int aux,int &j){
+	for (j=0;j<tam;j++){
+		if (cache[j].endBloco==end.endBloco){
+			if(aux==1)
+				return cache[j].palavras[end.endPalavra];
+			else
+				return 1;
+		}
+	}
+	return -1;
+}
+
+void Troca_Caches(Linha *cache1,int tam,Linha *cache2){
+	for(int i=0;i<tam;i++){
+		if(cache2[i].atualiza==1){
+			cache1[i].atualiza=cache2[i].atualiza;
+			cache1[i].endBloco=cache2[i].endBloco;
+			for(int j=0;j<4;j++){
+				cache1[i].palavras[j]=cache2[i].palavras[j];
+			}
+		}
+	}
+		zera_cache(cache2,tam);
+}
+
+void pega_arquivo(int endBloco,Linha *cache,int tam){
+	FILE* disco;
+	Linha aux;
+	int a,auxiliar=0;
+
+	a=endBloco*sizeof(Linha);
+	disco= fopen("hd.dat","r");
+	fseek(disco,a,SEEK_SET);
+	fread(&aux,sizeof(Linha),1,disco);
+	fclose(disco);
+
+	for(int i=0;i<tam;i++){
+		if(cache[i].endBloco==-1){
+			if(auxiliar==0){
+				auxiliar++;
+				for(int j=0;j<4;j++){
+					cache[i].atualiza=0;
+					cache[i].endBloco=aux.endBloco;
+					cache[i].palavras[j]=aux.palavras[j];
+					cache[i].cachehit=0;
+				}
+			}
+		}
+	}
+
+	if(auxiliar==0){
+			int elimina=0;
+			for (int i = 0; i < tam; i++){
+				if (cache[elimina].cachehit > cache[i].cachehit)
+					elimina = i;
+			}
+
+			if (cache[elimina].atualiza==1){
+				for (int j=0; j<4;j++){
+					Linha aux2;
+					aux2.palavras[j] = cache[elimina].palavras[j];
+					aux2.endBloco = cache[elimina].endBloco;
+					cache[elimina].palavras[j]=aux.palavras[j];
+					aux.palavras[j]=aux2.palavras[j];
+				}
+			}
+			cache[elimina].endBloco=endBloco;
+			cache[elimina].cachehit=0;
+
+			if (cache[elimina].atualiza == 0)
+				for (int i=0;i<4;i++){
+					cache[elimina].atualiza=0;
+					cache[elimina].palavras[i]=aux.palavras[i];
+				}
+			cache[elimina].atualiza=0;
+		}
+
+
+}
+
+void pega_da_Cache(int endBloco, Linha *cache, int vai, Linha *origem, int vazo){
+	int aux = 0;
+	for (int i=0;i<vai;i++) {
+		if (cache[i].endBloco==-1 && aux==0){
+			aux++;
+			for (int j=0;j<vazo;j++){
+				if (origem[j].endBloco==endBloco){
+					cache[i].endBloco=endBloco;
+					cache[i].cachehit=0;
+					cache[i].atualiza=origem[j].atualiza;
+					origem[j].endBloco=-1;
+					origem[j].cachehit=0;
+
+					for (int l=0;l<4;l++) {
+						if(origem[j].atualiza==1){
+							cache[i].atualiza=1;
+						}
+						else
+							cache[i].atualiza=0;
+						cache[i].palavras[l]=origem[j].palavras[l];
+						origem[i].palavras[l]=-1;
+					}
+				}
+			}
+		}
+	}
+	if(aux==0){
+		int elimina=0;
+		for(int i=0;i<vai;i++){
+			if(cache[elimina].cachehit>cache[i].cachehit)
+				elimina = i;
+		}
+		for(int l=0;l<vazo;l++){
+			if(origem[l].endBloco==endBloco){
+				Linha aux;
+				aux.atualiza = cache[elimina].atualiza;
+				aux.cachehit = cache[elimina].cachehit;
+				aux.endBloco = cache[elimina].endBloco;
+				cache[elimina].endBloco=endBloco;
+				cache[elimina].cachehit=0;
+				origem[l].endBloco = aux.endBloco;
+				origem[l].cachehit =0;
+				origem[l].atualiza = aux.atualiza;
+				for (int j= 0;j<4;j++){
+					aux.palavras[j]=cache[elimina].palavras[j];
+					cache[elimina].palavras[j] = origem[l].palavras[j];
+					origem[l].palavras[j] = aux.palavras[j];
+				}
+			}
+		}
+	}
+}
+
+
+//-------------------------------------------------FUNCOES PRINCIPAIS-------------------------------------------------------------------------------//
+
+int MMU(TEndereco end,int &miss1,int &miss2,int &miss3,int &cache1hit,int &cache2hit,int &cache3hit,int taml1,int taml2,int taml3,Linha *cache1,Linha *cache2,Linha *cache3,Linha*ram,int&miss4,int&hit4,int taml4){
+	int i=0,j=0;
+	i=busca_cache(end, cache1, taml1,1,j);
+	if (i!=-1){
+		cache1[j].cachehit++;
+		cache1hit++;
+		return i;//busca_cache(end, cache1, taml1,1,j);
+	}
+	miss1++;
+
+	i=busca_cache(end, cache2, taml2,2,j);
+	if (i!=-1){
+		cache2[j].cachehit++;
+		cache2hit++;
+		pega_da_Cache(end.endBloco,cache1,taml1,cache2,taml2);
+		return busca_cache(end,cache1,taml1,1,j);
+	}
+	miss2++;
+
+	i=busca_cache(end,cache3,taml3,3,j);
+	if(i!=-1){
+		cache3[j].cachehit++;
+		cache3hit++;
+		pega_da_Cache(end.endBloco, cache2, taml2, cache3, taml3);
+		pega_da_Cache(end.endBloco, cache1, taml1, cache2, taml2);
+		return busca_cache(end, cache1, taml1,1,j);
+	}
+	miss3++;
+
+	i=busca_cache(end,ram,taml4,4,j);
+	if(i!=-1){
+		ram[j].cachehit++;
+		hit4++;
+		pega_da_Cache(end.endBloco, cache3, taml3, ram, taml4);
+		pega_da_Cache(end.endBloco, cache2, taml2, cache3, taml3);
+		pega_da_Cache(end.endBloco, cache1, taml1, cache2, taml2);
+		return busca_cache(end, cache1, taml1,1,j);
+	}
+	miss4++;
+
+	pega_arquivo(end.endBloco, ram, taml4);
+	pega_da_Cache(end.endBloco, cache3, taml3, ram, taml4);
+	pega_da_Cache(end.endBloco, cache2, taml2, cache3, taml3);
+	pega_da_Cache(end.endBloco, cache1, taml1, cache2, taml2);
+	return busca_cache(end, cache1, taml1,1,j);
+}
+
+void Maquina(Instrucao instrucao[TAM_INSTRUCAO],int pc,int&miss1,int&miss2,int&miss3,int &hit1, int &hit2, int &hit3,int taml1,int taml2,int taml3,Linha *cache1,Linha *cache2,Linha *cache3,Linha*ram,int&miss4,int&hit4,int taml4){
+	int soma,envia,subtracao;
+	switch (instrucao[pc].opcode){
+
+	case -1:
+		atualiza_arquivo(ram,taml4);
+		Troca_Caches(ram,taml3,cache3);
+		atualiza_arquivo(ram,taml4);
+		Troca_Caches(cache3,taml2,cache2);
+		Troca_Caches(ram,taml3,cache3);
+		atualiza_arquivo(ram,taml4);
+		Troca_Caches(cache2,taml1,cache1);
+		Troca_Caches(cache3,taml2,cache2);
+		Troca_Caches(ram,taml3,cache3);
+		atualiza_arquivo(ram,taml4);
+		cout << "Finalizado!" << endl;
+		break;
+
+	case 0:
+		soma=MMU(instrucao[pc].endereco1,miss1,miss2,miss3,hit1,hit2,hit3,taml1,taml2,taml3,cache1,cache2,cache3,ram,miss4,hit4,taml4)+MMU(instrucao[pc].endereco2,miss1,miss2,miss3,hit1,hit2,hit3,taml1, taml2, taml3,cache1,cache2,cache3,ram,miss4,hit4,taml4);
+		envia=MMU(instrucao[pc].endereco1,miss1,miss2,miss3,hit1,hit2,hit3,taml1,taml2,taml3,cache1,cache2,cache3,ram,miss4,hit4,taml4);
+		atribui_cache(soma,cache1, taml1,instrucao[pc].endereco1);
+		break;
+
+	case 1:
+		subtracao = MMU(instrucao[pc].endereco1,miss1,miss2,miss3,hit1,hit2,hit3,taml1,taml2,taml3,cache1,cache2,cache3,ram,miss4,hit4,taml4) - MMU(instrucao[pc].endereco2,miss1,miss2,miss3,hit1,hit2,hit3,taml1,taml2,taml3,cache1,cache2,cache3,ram,miss4,hit4,taml4);
+		envia = MMU(instrucao[pc].endereco1,miss1,miss2,miss3,hit1,hit2,hit3,taml1,taml2,taml3,cache1,cache2,cache3,ram,miss4,hit4,taml4);
+		atribui_cache(subtracao,cache1,taml1,instrucao[pc].endereco1);
+
+		break;
+
+	}
+}
+
+//---------------------------------------------------------------------------------------------------------------------------------------------------//
+
+
+
